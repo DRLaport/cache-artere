@@ -2,53 +2,78 @@ import request from 'supertest';
 import app from '../app';
 
 describe('Cache API', () => {
-  it('successfully store a cache entry', async () => {
+  // Test setting a cache value
+  it('should set a cache value', async () => {
     const response = await request(app)
       .post('/cache')
       .send({ key: 'test', value: 'value', ttl: 1 });
     expect(response.statusCode).toBe(201);
   });
 
-  it('retrieve a stored cache entry', async () => {
+  // Test retrieving a stored cache value
+  it('should retrieve a stored cache value', async () => {
     await request(app)
       .post('/cache')
       .send({ key: 'test', value: 'value', ttl: 1 });
+    
     const response = await request(app)
       .get('/cache/test');
+    
     expect(response.statusCode).toBe(200);
     expect(response.body.value).toBe('value');
   });
 
-  it('delete a cache entry', async () => {
+  // Test deleting a cache value
+  it('should delete a cache value', async () => {
     await request(app)
       .post('/cache')
       .send({ key: 'test', value: 'value', ttl: 1 });
+    
     const response = await request(app)
       .delete('/cache/test');
+    
     expect(response.statusCode).toBe(200);
   });
 
-  it('return 404 for an expired cache entry', (done) => {
-    request(app)
+  // Test that an expired cache value returns 404
+  it('should return 404 for expired cache value', async () => {
+    jest.useFakeTimers(); // Use fake timers to control time
+    
+    await request(app)
       .post('/cache')
-      .send({ key: 'test', value: 'value', ttl: 1 })
-      .then(() => {
-        setTimeout(() => {
-          request(app)
-            .get('/cache/test')
-            .then((response: request.Response) => {
-              expect(response.statusCode).toBe(404);
-              done();
-            })
-            .catch((err: any) => done(err));
-        }, 1500);
-      });
+      .send({ key: 'test', value: 'value', ttl: 1 });
+    
+    jest.advanceTimersByTime(1500); // Advance time to simulate TTL expiration
+    
+    const response = await request(app).get('/cache/test');
+    
+    expect(response.statusCode).toBe(404);
   });
 
-  it('return 400 for missing required fields', async () => {
+  // Test missing required fields returns 400
+  it('should return 400 for missing required fields', async () => {
     const response = await request(app)
       .post('/cache')
       .send({ key: 'test' });
+    
     expect(response.statusCode).toBe(400);
   });
+
+  // Test retrieving cache statistics
+  it('should return cache stats', async () => {
+    const response = await request(app).get('/cache/stats');
+    
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toHaveProperty('hits');
+    expect(response.body).toHaveProperty('misses');
+    expect(response.body).toHaveProperty('size');
+  });
+
+
+  it('should handle retrieving a non-existent key', async () => {
+    const response = await request(app).get('/cache/nonExistentKey');
+    
+    expect(response.statusCode).toBe(404);
+  });
+
 });
